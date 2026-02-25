@@ -20,8 +20,12 @@ import "swiper/css/pagination";
 import "./styles.css";
 
 export async function generateMetadata() {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
   return {
-    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL!),
+    ...(siteUrl && {
+      metadataBase: new URL(siteUrl),
+    }),
   };
 }
 
