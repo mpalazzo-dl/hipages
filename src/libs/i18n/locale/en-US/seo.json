@@ -1,0 +1,16 @@
+{
+  "articles": {
+    "description": "",
+    "title": "Articles"
+  },
+  "search": {
+    "description": "",
+    "title": "Search"
+  },
+  "forms": {
+    "thankYou": {
+      "description": "",
+      "title": "Thank You"
+    }
+  }
+}

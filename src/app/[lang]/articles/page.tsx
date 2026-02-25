@@ -1,0 +1,168 @@
+import { Suspense } from "react";
+import type { Metadata } from "next";
+import { draftMode } from "next/headers";
+import { notFound } from "next/navigation";
+
+import { fetchAllCategories, fetchSpecialtyPageData } from "@aces/contentful";
+import { defaultLocale, getLocale } from "@aces/i18n";
+import { PageProps, SpecialtyPages } from "@aces/types";
+import { toSingleValueArray } from "@aces/utils";
+import { Box, Container } from "@aces/ui";
+import {
+  ArticleListing,
+  ArticleListingSkeleton,
+  ArticlesPageBreadcrumbs,
+  buildMetadata,
+  EnableArticles,
+  FeaturedArticlesServer,
+  fetchArticles,
+  fetchAllArticlesTotal,
+  ArticleListingConfig,
+  OrderTypes,
+  fetchFeaturedSlugs,
+  DefaultPageHero,
+  DefaultPageBody,
+} from "@aces/features";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<PageProps>;
+}): Promise<Metadata> {
+  const resolvedParams = await Promise.resolve(params);
+
+  const { lang } = resolvedParams;
+  const t = await getLocale(lang, "seo");
+
+  let seoData = {
+    title: t.articles.title,
+    description: t.articles.description,
+  };
+
+  const { isEnabled } = await draftMode();
+  const pageData = await fetchSpecialtyPageData(
+    SpecialtyPages.Articles,
+    isEnabled,
+  );
+  const pageResponse = pageData.pageResponse.data.pageCollection.items[0];
+
+  if (pageResponse) {
+    seoData = pageResponse.seo;
+  }
+
+  return await buildMetadata(seoData, {});
+}
+
+export default async function ArticlesPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<PageProps>;
+  searchParams: Promise<{ categories?: string[]; order?: OrderTypes }>;
+}) {
+  const resolvedParams = await Promise.resolve(params);
+  const resolvedSearchParams = await Promise.resolve(searchParams);
+
+  const categories = resolvedSearchParams?.categories
+    ? toSingleValueArray(resolvedSearchParams?.categories)
+    : null;
+  const order =
+    resolvedSearchParams?.order || ArticleListingConfig.DefaultOrder;
+
+  const { isEnabled } = await draftMode();
+  const { lang = defaultLocale } = resolvedParams;
+
+  if (!EnableArticles) {
+    notFound();
+  }
+
+  const initialArticles = await fetchArticles(
+    categories,
+    ArticleListingConfig.ArticlesLimit,
+    0,
+    order,
+    [],
+    isEnabled,
+    lang,
+  );
+
+  const excludedSlugs = await fetchFeaturedSlugs(isEnabled, lang);
+
+  const allArticlesTotal = await fetchAllArticlesTotal(
+    excludedSlugs,
+    isEnabled,
+    lang,
+  );
+
+  const categoriesCollection = await fetchAllCategories(
+    excludedSlugs,
+    isEnabled,
+    lang,
+  );
+
+  const pageData = await fetchSpecialtyPageData(
+    SpecialtyPages.Articles,
+    isEnabled,
+    lang,
+  );
+  const pageResponse = pageData.pageResponse.data.pageCollection.items[0];
+
+  let pageHeroResponse;
+  let pageBodyResponse;
+
+  if (pageResponse) {
+    pageHeroResponse = pageData.pageHeroResponse.data.page.pageHero;
+    pageBodyResponse =
+      pageData.pageBodyResponse.data.page.pageBodyCollection.items;
+  }
+
+  return (
+    <Box>
+      {pageHeroResponse && (
+        <DefaultPageHero
+          item={pageHeroResponse}
+          preview={isEnabled}
+          lang={lang}
+        />
+      )}
+      <Container>
+        <Box marginY={8}>
+          <ArticlesPageBreadcrumbs lang={lang} />
+          {excludedSlugs && (
+            <FeaturedArticlesServer
+              title="Featured Articles"
+              lang={lang}
+              preview={isEnabled}
+            />
+          )}
+          <Suspense
+            fallback={
+              <ArticleListingSkeleton
+                limit={ArticleListingConfig.ArticlesLimit}
+              />
+            }
+          >
+            {allArticlesTotal !== 0 && (
+              <ArticleListing
+                initialArticles={initialArticles.items}
+                initialTotal={initialArticles.total}
+                categoriesCollection={categoriesCollection}
+                allArticlesTotal={allArticlesTotal}
+                excludedSlugs={excludedSlugs}
+                preview={isEnabled}
+                lang={lang}
+              />
+            )}
+          </Suspense>
+        </Box>
+      </Container>
+      {pageBodyResponse && (
+        <DefaultPageBody
+          items={pageBodyResponse}
+          preview={isEnabled}
+          lang={lang}
+        />
+      )}
+    </Box>
+  );
+}
