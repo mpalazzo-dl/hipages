@@ -15,6 +15,12 @@ export function middleware(request: NextRequest) {
     return;
   }
 
+  try {
+    const testUrl = new URL(request.url);
+  } catch {
+    return;
+  }
+
   const acceptLanguage = request.headers.get("accept-language") || "";
   const browserLocale = acceptLanguage.split(",")[0].split("-")[0];
 
@@ -28,15 +34,19 @@ export function middleware(request: NextRequest) {
     pathname.startsWith(`/${defaultLocale}/`) ||
     pathname === `/${defaultLocale}`
   ) {
-    return NextResponse.redirect(
-      new URL(
-        pathname.replace(
-          `/${defaultLocale}`,
-          pathname === `/${defaultLocale}` ? "/" : "",
+    try {
+      return NextResponse.redirect(
+        new URL(
+          pathname.replace(
+            `/${defaultLocale}`,
+            pathname === `/${defaultLocale}` ? "/" : "",
+          ),
+          request.url,
         ),
-        request.url,
-      ),
-    );
+      );
+    } catch {
+      return;
+    }
   }
 
   const pathnameIsMissingLocale = locales.every(
@@ -46,12 +56,16 @@ export function middleware(request: NextRequest) {
   );
 
   if (pathnameIsMissingLocale) {
-    return NextResponse.rewrite(
-      new URL(
-        `/${detectedLocale}${pathname}${request.nextUrl.search}`,
-        request.nextUrl.href,
-      ),
-    );
+    try {
+      return NextResponse.rewrite(
+        new URL(
+          `/${detectedLocale}${pathname}${request.nextUrl.search}`,
+          request.nextUrl.href,
+        ),
+      );
+    } catch {
+      return;
+    }
   }
 }
 
